@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Compiled binary (built at install time per-machine)
+notch-notify
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.xcodeproj/
+*.xcworkspace/

@@ -1,0 +1,97 @@
+{
+  "notification": {
+    "enabled": true,
+    "position": "top-center",
+    "width": 380,
+    "max_lines": 3,
+    "corner_radius": 16,
+    "duration_seconds": 5.5,
+    "icon": "",
+
+    "colors": {
+      "normal": {
+        "background": [0.05, 0.05, 0.07, 0.96],
+        "border": [1.0, 1.0, 1.0, 0.08],
+        "title": [0.85, 0.55, 0.40, 1.0],
+        "text": [0.95, 0.95, 0.95, 1.0]
+      },
+      "warning": {
+        "background": [0.12, 0.09, 0.04, 0.96],
+        "border": [0.85, 0.65, 0.20, 0.25],
+        "title": [0.85, 0.55, 0.40, 1.0],
+        "text": [0.95, 0.95, 0.95, 1.0]
+      },
+      "critical": {
+        "background": [0.14, 0.04, 0.04, 0.96],
+        "border": [0.90, 0.25, 0.20, 0.30],
+        "title": [0.85, 0.55, 0.40, 1.0],
+        "text": [0.95, 0.95, 0.95, 1.0]
+      }
+    }
+  },
+
+  "sound": {
+    "enabled": true,
+    "file": "~/.config/claude-tap/default.wav",
+    "volume": 0.15,
+    "files": {
+      "stop": "",
+      "notification": "",
+      "rate_limit_warning": ""
+    }
+  },
+
+  "terminal_apps": [
+    "com.apple.Terminal",
+    "com.googlecode.iterm2",
+    "net.kovidgoyal.kitty",
+    "co.zeit.hyper",
+    "com.mitchellh.ghostty",
+    "io.alacritty",
+    "dev.warp.Warp-Stable"
+  ],
+
+  "rate_limits": {
+    "warning_threshold": 80,
+    "critical_threshold": 90
+  },
+
+  "status_line": {
+    "enabled": true,
+    "show_context_bar": true,
+    "show_rate_5h": true,
+    "show_rate_7d": true,
+    "show_lines_changed": true
+  },
+
+  "message": {
+    "max_length": 300
+  },
+
+  "skip_if_focused": true,
+
+  "quiet_hours": {
+    "enabled": false,
+    "start": "22:00",
+    "end": "07:00"
+  },
+
+  "history": {
+    "enabled": true,
+    "max_entries": 100,
+    "clear_after_days": 30
+  },
+
+  "theme": {
+    "auto": false,
+    "day": "light",
+    "night": "dark",
+    "day_start": "08:00",
+    "night_start": "18:00"
+  },
+
+  "auto_update": {
+    "check_on_install": true,
+    "notify_only": true
+  }
+}
