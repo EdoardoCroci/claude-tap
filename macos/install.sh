@@ -16,6 +16,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_DIR="$HOME/.config/claude-tap"
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
@@ -120,7 +121,6 @@ except:
 " 2>/dev/null) || CHECK_UPDATE="false"
 
     if [ "$CHECK_UPDATE" = "true" ]; then
-        REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
         if [ -f "$REPO_DIR/scripts/update.sh" ]; then
             "$REPO_DIR/scripts/update.sh" --check-only 2>/dev/null || true
         fi
@@ -427,23 +427,11 @@ for urgency in ['normal','warning','critical']:
 fi
 
 # ──────────────────────────────────────────────────────────────
-# 3. Create config directory and copy assets
-# ──────────────────────────────────────────────────────────────
-
-info "Setting up $CONFIG_DIR..."
-mkdir -p "$CONFIG_DIR"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-cp "$REPO_DIR/assets/claude-icon.png" "$CONFIG_DIR/claude-icon.png"
-cp "$REPO_DIR/assets/sounds/default.wav" "$CONFIG_DIR/default.wav"
-cp "$REPO_DIR/assets/themes.json" "$CONFIG_DIR/themes.json"
-chmod 0600 "$CONFIG_DIR/claude-icon.png" "$CONFIG_DIR/default.wav" "$CONFIG_DIR/themes.json"
-success "Assets copied (icon + sound + themes)"
-
-# ──────────────────────────────────────────────────────────────
-# 4. Write config file
+# 3. Write config file (if interactive config was done)
 # ──────────────────────────────────────────────────────────────
 
 if [ "$SHOULD_CONFIGURE" = "true" ]; then
+    mkdir -p "$CONFIG_DIR"
     cat > "$CONFIG_DIR/config.json" << CONFIGEOF
 {
   "notification": {
@@ -540,104 +528,13 @@ if [ "$SHOULD_CONFIGURE" = "true" ]; then
 CONFIGEOF
     chmod 0600 "$CONFIG_DIR/config.json"
     success "Config written: $CONFIG_DIR/config.json"
-else
-    success "Config file preserved"
 fi
 
 # ──────────────────────────────────────────────────────────────
-# 5. Compile Swift binary
+# 4. Run non-interactive setup (assets, compile, hooks)
 # ──────────────────────────────────────────────────────────────
 
-info "Compiling notification overlay..."
-swiftc -O \
-    -o "$CONFIG_DIR/notch-notify" \
-    "$SCRIPT_DIR/src/NotchNotification.swift" \
-    -framework AppKit \
-    2>&1 || fail "Compilation failed. Do you have Xcode Command Line Tools installed?"
-
-chmod +x "$CONFIG_DIR/notch-notify"
-success "Binary compiled"
-
-# ──────────────────────────────────────────────────────────────
-# 6. Make hook scripts executable
-# ──────────────────────────────────────────────────────────────
-
-chmod +x "$SCRIPT_DIR/src/notify.sh"
-chmod +x "$SCRIPT_DIR/src/statusline.sh"
-
-# ──────────────────────────────────────────────────────────────
-# 7. Register Claude Code hooks
-# ──────────────────────────────────────────────────────────────
-
-info "Registering Claude Code hooks..."
-
-mkdir -p "$CLAUDE_DIR"
-
-python3 -c "
-import json, os, sys
-
-settings_path = '$SETTINGS_FILE'
-notify_cmd = '$SCRIPT_DIR/src/notify.sh'
-statusline_cmd = '$SCRIPT_DIR/src/statusline.sh'
-
-# Load existing settings or start fresh
-try:
-    with open(settings_path) as f:
-        settings = json.load(f)
-except:
-    settings = {}
-
-# Ensure hooks structure exists
-if 'hooks' not in settings:
-    settings['hooks'] = {}
-
-# Hook entry format: matcher + hooks array (required by Claude Code)
-hook_entry = {
-    'matcher': '',
-    'hooks': [{'type': 'command', 'command': notify_cmd}]
-}
-
-# Register Notification hook
-existing_notif = settings['hooks'].get('Notification', [])
-# Remove previous claude-tap entries (check nested hooks array)
-def has_cmd(entry, cmd):
-    if cmd in entry.get('command', ''):
-        return True
-    for h in entry.get('hooks', []):
-        if cmd in h.get('command', ''):
-            return True
-    return False
-existing_notif = [h for h in existing_notif if not has_cmd(h, notify_cmd)]
-existing_notif.append(hook_entry)
-settings['hooks']['Notification'] = existing_notif
-
-# Register Stop hook
-existing_stop = settings['hooks'].get('Stop', [])
-existing_stop = [h for h in existing_stop if not has_cmd(h, notify_cmd)]
-existing_stop.append(hook_entry)
-settings['hooks']['Stop'] = existing_stop
-
-# Register status line
-settings['statusLine'] = {
-    'type': 'command',
-    'command': statusline_cmd,
-    'padding': 2
-}
-
-# Backup existing settings
-if os.path.exists(settings_path):
-    import shutil
-    from datetime import datetime
-    backup = settings_path + '.backup.' + datetime.now().strftime('%Y%m%d%H%M%S')
-    shutil.copy2(settings_path, backup)
-
-# Write updated settings
-with open(settings_path, 'w') as f:
-    json.dump(settings, f, indent=2)
-    f.write('\n')
-" 2>&1
-
-success "Hooks registered in $SETTINGS_FILE"
+"$SCRIPT_DIR/setup.sh" "$REPO_DIR"
 
 echo ""
 

@@ -85,6 +85,12 @@ brew tap EdoardoCroci/tap
 brew install claude-tap
 ```
 
+This sets up everything automatically with sensible defaults — just restart Claude Code to activate. To customize settings afterwards, run the interactive wizard:
+
+```bash
+$(brew --prefix claude-tap)/macos/install.sh --reconfigure
+```
+
 ### macOS (manual)
 
 ```bash
@@ -109,7 +115,7 @@ cd claude-tap\windows
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-The installer walks you through an interactive setup wizard where you choose notification position (top/bottom, left/center/right), sounds, status line sections, rate limit thresholds, and colors. Then restart Claude Code and run `/hooks` to verify.
+The manual and one-liner installers walk you through an interactive setup wizard where you choose notification position (top/bottom, left/center/right), sounds, status line sections, rate limit thresholds, and colors. Then restart Claude Code and run `/hooks` to verify.
 
 To re-run the setup wizard later:
 
@@ -141,7 +147,8 @@ claude-tap/
 │   ├── screenshots/               # README images
 │   └── sounds/default.wav
 ├── macos/                         # macOS implementation
-│   ├── install.sh
+│   ├── install.sh                 # Interactive setup wizard
+│   ├── setup.sh                   # Non-interactive setup (used by Homebrew)
 │   ├── uninstall.sh
 │   └── src/
 │       ├── NotchNotification.swift
