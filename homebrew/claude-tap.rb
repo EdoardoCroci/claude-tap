@@ -10,30 +10,21 @@ class ClaudeTap < Formula
 
   def install
     prefix.install Dir["*"]
-  end
-
-  def post_install
-    system "#{prefix}/macos/setup.sh", prefix.to_s, "--quiet"
+    bin.install_symlink prefix/"macos/setup.sh" => "claude-tap-setup"
   end
 
   def caveats
-    msg = <<~EOS
-      Claude Tap is ready to use! Restart Claude Code to activate.
+    <<~EOS
+      Run the setup to get started:
+        claude-tap-setup
 
       To customize settings:
+        claude-tap-setup
         #{prefix}/macos/install.sh --reconfigure
 
       Config: ~/.config/claude-tap/config.json
       Uninstall: #{prefix}/macos/uninstall.sh
     EOS
-    unless File.exist?(File.expand_path("~/.config/claude-tap/notch-notify"))
-      msg += <<~EOS
-
-        NOTE: Notification overlay was not compiled (swiftc not found).
-        Run: xcode-select --install && #{prefix}/macos/setup.sh #{prefix}
-      EOS
-    end
-    msg
   end
 
   test do

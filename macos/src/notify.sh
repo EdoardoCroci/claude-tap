@@ -15,6 +15,19 @@ CONFIG_DIR="$HOME/.config/claude-tap"
 CONFIG_FILE="$CONFIG_DIR/config.json"
 
 # ──────────────────────────────────────────────────────────────
+# Bootstrap: auto-setup on first run if config is missing
+# ──────────────────────────────────────────────────────────────
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    SETUP_SCRIPT="$SCRIPT_DIR/../../macos/setup.sh"
+    [ -f "$SETUP_SCRIPT" ] || SETUP_SCRIPT="$SCRIPT_DIR/../setup.sh"
+    if [ -f "$SETUP_SCRIPT" ]; then
+        BASE_DIR="$(cd "$(dirname "$SETUP_SCRIPT")/.." && pwd)"
+        "$SETUP_SCRIPT" "$BASE_DIR" --quiet 2>/dev/null
+    fi
+fi
+
+# ──────────────────────────────────────────────────────────────
 # Read configuration (via python3, which ships with macOS)
 # ──────────────────────────────────────────────────────────────
 

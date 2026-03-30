@@ -83,9 +83,10 @@ curl -fsSL https://raw.githubusercontent.com/EdoardoCroci/claude-tap/main/instal
 ```bash
 brew tap EdoardoCroci/tap
 brew install claude-tap
+claude-tap-setup
 ```
 
-This sets up everything automatically with sensible defaults — just restart Claude Code to activate. To customize settings afterwards, run the interactive wizard:
+This copies assets, compiles the notification binary, writes a default config, and registers Claude Code hooks. Then restart Claude Code and run `/hooks` to verify. To customize settings later:
 
 ```bash
 $(brew --prefix claude-tap)/macos/install.sh --reconfigure
