@@ -72,13 +72,7 @@ So I built this: a lightweight notification system that pings me with a sound an
 
 ## Quick Start
 
-### One-liner (macOS / Linux)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/EdoardoCroci/claude-tap/main/install-remote.sh | bash
-```
-
-### Homebrew (macOS)
+### Homebrew (macOS) — recommended
 
 ```bash
 brew tap EdoardoCroci/tap
@@ -86,13 +80,23 @@ brew install claude-tap
 claude-tap-setup
 ```
 
-This copies assets, compiles the notification binary, writes a default config, and registers Claude Code hooks. Then restart Claude Code and run `/hooks` to verify. To customize settings later:
+`brew install` downloads the source and installs `jq` as a dependency. `claude-tap-setup` copies assets, compiles the Swift notification binary, writes a default config (`~/.config/claude-tap/config.json`), and registers hooks in `~/.claude/settings.json`. Restart Claude Code and run `/hooks` to verify.
+
+To customize notification position, sounds, themes, and more:
 
 ```bash
 $(brew --prefix claude-tap)/macos/install.sh --reconfigure
 ```
 
-### macOS (manual)
+### One-liner (macOS / Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/EdoardoCroci/claude-tap/main/install-remote.sh | bash
+```
+
+This clones the repo to `~/.local/share/claude-tap` and runs the interactive setup wizard. Restart Claude Code and run `/hooks` to verify.
+
+### Manual (macOS)
 
 ```bash
 git clone https://github.com/EdoardoCroci/claude-tap.git
@@ -100,7 +104,7 @@ cd claude-tap/macos
 ./install.sh
 ```
 
-### Linux (not currently tested)
+### Manual (Linux — not currently tested)
 
 ```bash
 git clone https://github.com/EdoardoCroci/claude-tap.git
@@ -108,7 +112,7 @@ cd claude-tap/linux
 ./install.sh
 ```
 
-### Windows (not currently tested)
+### Manual (Windows — not currently tested)
 
 ```powershell
 git clone https://github.com/EdoardoCroci/claude-tap.git
@@ -116,12 +120,15 @@ cd claude-tap\windows
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-The manual and one-liner installers walk you through an interactive setup wizard where you choose notification position (top/bottom, left/center/right), sounds, status line sections, rate limit thresholds, and colors. Then restart Claude Code and run `/hooks` to verify.
+The manual and one-liner installers walk you through an interactive setup wizard where you choose notification position, sounds, status line sections, rate limit thresholds, and colors. Restart Claude Code and run `/hooks` to verify.
 
-To re-run the setup wizard later:
+To re-run the setup wizard:
 
 ```bash
-# macOS / Linux
+# Homebrew
+$(brew --prefix claude-tap)/macos/install.sh --reconfigure
+
+# Manual / One-liner (macOS / Linux)
 ./install.sh --reconfigure
 
 # Windows
@@ -389,39 +396,54 @@ On macOS, the notification overlay is a compiled Swift binary using AppKit. On L
 
 ## Updating
 
-### Automatic update check
-
-The installer checks for updates automatically when run (if `auto_update.check_on_install` is `true` in your config). You can also check manually:
+### Homebrew
 
 ```bash
-# Check for updates
-./scripts/update.sh --check-only
-
-# Check and update (pulls + re-installs)
-./scripts/update.sh
-
-# Windows
-powershell -ExecutionPolicy Bypass -File scripts\update.ps1 -CheckOnly
-powershell -ExecutionPolicy Bypass -File scripts\update.ps1
+brew upgrade claude-tap
+claude-tap-setup
 ```
 
-### Manual update
+`brew upgrade` pulls the latest source. Re-run `claude-tap-setup` to recompile the binary and refresh hooks. Your config is preserved.
+
+### Manual / One-liner
 
 ```bash
-cd claude-tap
+cd claude-tap    # or ~/.local/share/claude-tap for one-liner installs
 git pull
 
 # macOS
 cd macos && ./install.sh
+
+# Linux
+cd linux && ./install.sh
 
 # Windows
 cd windows
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-`git pull` updates the scripts in place. On macOS, re-running the installer recompiles the binary. Your config is preserved.
+`git pull` updates the scripts in place. Re-running the installer recompiles the binary on macOS. Your config is preserved — the installer skips the wizard if a config already exists. Pass `--reconfigure` to change settings.
+
+The installer also checks for updates automatically when run (if `auto_update.check_on_install` is `true` in your config). You can check manually:
+
+```bash
+./scripts/update.sh --check-only   # check only
+./scripts/update.sh                # check and update
+```
 
 ## Uninstalling
+
+### Homebrew
+
+```bash
+$(brew --prefix claude-tap)/macos/uninstall.sh
+brew uninstall claude-tap
+brew untap EdoardoCroci/tap        # optional, removes the tap
+```
+
+Run `uninstall.sh` first to remove hooks and config, then `brew uninstall` to remove the formula.
+
+### Manual / One-liner
 
 ```bash
 # macOS
@@ -435,7 +457,7 @@ cd claude-tap\windows
 powershell -ExecutionPolicy Bypass -File uninstall.ps1
 ```
 
-This removes hooks, assets, and config. The cloned repo folder is left for you to delete manually.
+This removes hooks from `~/.claude/settings.json`, deletes `~/.config/claude-tap/` (config, binary, assets), and cleans up temp files. The cloned repo folder is left for you to delete manually (`rm -rf claude-tap` or `rm -rf ~/.local/share/claude-tap` for one-liner installs).
 
 ## Testing
 
