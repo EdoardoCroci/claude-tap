@@ -14,7 +14,14 @@
 #   BASE_DIR  = root of the claude-tap repo/install (default: parent of this script)
 #   --quiet   = suppress informational output
 
-BASE_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
+# Resolve through symlinks to find the real script location
+SELF="$0"
+while [ -L "$SELF" ]; do
+    DIR="$(cd "$(dirname "$SELF")" && pwd)"
+    SELF="$(readlink "$SELF")"
+    [[ "$SELF" != /* ]] && SELF="$DIR/$SELF"
+done
+BASE_DIR="${1:-$(cd "$(dirname "$SELF")/.." && pwd)}"
 QUIET=""
 for arg in "$@"; do [ "$arg" = "--quiet" ] && QUIET="1"; done
 
