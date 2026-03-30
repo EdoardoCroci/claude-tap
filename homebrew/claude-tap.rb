@@ -11,6 +11,8 @@ class ClaudeTap < Formula
   def install
     prefix.install Dir["*"]
     bin.install_symlink prefix/"macos/setup.sh" => "claude-tap-setup"
+    bin.install_symlink prefix/"macos/configure.sh" => "claude-tap-configure"
+    bin.install_symlink prefix/"macos/uninstall.sh" => "claude-tap-uninstall"
   end
 
   def caveats
@@ -18,12 +20,13 @@ class ClaudeTap < Formula
       Run the setup to get started:
         claude-tap-setup
 
-      To customize settings:
-        claude-tap-setup
-        #{prefix}/macos/install.sh --reconfigure
+      To customize settings (interactive wizard):
+        claude-tap-configure
+
+      To uninstall hooks and config:
+        claude-tap-uninstall
 
       Config: ~/.config/claude-tap/config.json
-      Uninstall: #{prefix}/macos/uninstall.sh
     EOS
   end
 

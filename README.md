@@ -85,7 +85,7 @@ claude-tap-setup
 To customize notification position, sounds, themes, and more:
 
 ```bash
-$(brew --prefix claude-tap)/macos/install.sh --reconfigure
+claude-tap-configure
 ```
 
 ### One-liner (macOS / Linux)
@@ -126,7 +126,7 @@ To re-run the setup wizard:
 
 ```bash
 # Homebrew
-$(brew --prefix claude-tap)/macos/install.sh --reconfigure
+claude-tap-configure
 
 # Manual / One-liner (macOS / Linux)
 ./install.sh --reconfigure
@@ -156,7 +156,8 @@ claude-tap/
 │   └── sounds/default.wav
 ├── macos/                         # macOS implementation
 │   ├── install.sh                 # Interactive setup wizard
-│   ├── setup.sh                   # Non-interactive setup (used by Homebrew)
+│   ├── setup.sh                   # Non-interactive setup (claude-tap-setup)
+│   ├── configure.sh               # Reconfigure wrapper (claude-tap-configure)
 │   ├── uninstall.sh
 │   └── src/
 │       ├── NotchNotification.swift
@@ -403,7 +404,7 @@ brew upgrade claude-tap
 claude-tap-setup
 ```
 
-`brew upgrade` pulls the latest source. Re-run `claude-tap-setup` to recompile the binary and refresh hooks. Your config is preserved.
+`brew upgrade` pulls the latest source. `claude-tap-setup` recompiles the binary and refreshes hooks. Your config is preserved.
 
 ### Manual / One-liner
 
@@ -436,12 +437,12 @@ The installer also checks for updates automatically when run (if `auto_update.ch
 ### Homebrew
 
 ```bash
-$(brew --prefix claude-tap)/macos/uninstall.sh
+claude-tap-uninstall
 brew uninstall claude-tap
 brew untap EdoardoCroci/tap        # optional, removes the tap
 ```
 
-Run `uninstall.sh` first to remove hooks and config, then `brew uninstall` to remove the formula.
+`claude-tap-uninstall` removes hooks and config. `brew uninstall` removes the formula.
 
 ### Manual / One-liner
 
