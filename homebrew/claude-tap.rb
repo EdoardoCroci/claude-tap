@@ -6,7 +6,7 @@ class ClaudeTap < Formula
   license "MIT"
 
   depends_on :macos
-  depends_on "jq" => :recommended
+  depends_on "jq"
 
   def install
     prefix.install Dir["*"]
