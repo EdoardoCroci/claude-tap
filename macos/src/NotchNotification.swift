@@ -60,7 +60,10 @@ struct NotifierConfig {
         "co.zeit.hyper",
         "com.mitchellh.ghostty",
         "io.alacritty",
-        "dev.warp.Warp-Stable"
+        "dev.warp.Warp-Stable",
+        "com.microsoft.VSCode",
+        "com.microsoft.VSCodeInsiders",
+        "com.todesktop.230313mzl4w4u92"
     ]
 
     /// Load config from disk. Missing or malformed fields fall back to defaults.
@@ -461,7 +464,7 @@ class NotchOverlay: NSWindow {
                 let runningApps = NSWorkspace.shared.runningApplications
                 for bundleID in config.terminalApps {
                     if let app = runningApps.first(where: { $0.bundleIdentifier == bundleID }) {
-                        app.activate()
+                        app.activate(options: .activateIgnoringOtherApps)
                         break
                     }
                 }

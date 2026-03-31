@@ -374,7 +374,10 @@ if ($ShouldConfigure) {
     "alacritty",
     "ghostty",
     "Hyper",
-    "Warp"
+    "Warp",
+    "Code",
+    "Code - Insiders",
+    "Cursor"
   ],
 
   "rate_limits": {

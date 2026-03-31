@@ -51,7 +51,8 @@ skip_focused   = config.get('skip_if_focused', True)
 max_length     = config.get('message', {}).get('max_length', 300)
 terminal_apps  = config.get('terminal_apps', [
     'com.apple.Terminal', 'com.googlecode.iterm2', 'net.kovidgoyal.kitty',
-    'co.zeit.hyper', 'com.mitchellh.ghostty', 'io.alacritty', 'dev.warp.Warp-Stable'
+    'co.zeit.hyper', 'com.mitchellh.ghostty', 'io.alacritty', 'dev.warp.Warp-Stable',
+    'com.microsoft.VSCode', 'com.microsoft.VSCodeInsiders', 'com.todesktop.230313mzl4w4u92'
 ])
 warn_threshold = config.get('rate_limits', {}).get('warning_threshold', 80)
 crit_threshold = config.get('rate_limits', {}).get('critical_threshold', 90)
@@ -127,7 +128,7 @@ print(f'FULL_MESSAGE={shlex.quote(full_message)}')
     SOUND_FILE="$CONFIG_DIR/default.wav"
     SOUND_VOLUME="0.15"
     SKIP_FOCUSED="true"
-    TERMINAL_APPS="com.apple.Terminal|com.googlecode.iterm2|net.kovidgoyal.kitty|co.zeit.hyper|com.mitchellh.ghostty|io.alacritty|dev.warp.Warp-Stable"
+    TERMINAL_APPS="com.apple.Terminal|com.googlecode.iterm2|net.kovidgoyal.kitty|co.zeit.hyper|com.mitchellh.ghostty|io.alacritty|dev.warp.Warp-Stable|com.microsoft.VSCode|com.microsoft.VSCodeInsiders|com.todesktop.230313mzl4w4u92"
     WARN_THRESHOLD=80
     CRIT_THRESHOLD=90
     QUIET_ENABLED="false"

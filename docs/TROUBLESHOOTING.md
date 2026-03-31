@@ -59,6 +59,9 @@ The `terminal_apps` config on Windows uses process names (as shown in Task Manag
 | Git Bash | `mintty` |
 | Alacritty | `alacritty` |
 | Ghostty | `ghostty` |
+| VS Code | `Code` |
+| VS Code Insiders | `Code - Insiders` |
+| Cursor | `Cursor` |
 
 ## Installation issues (Linux)
 
@@ -99,6 +102,20 @@ sudo apt install alsa-utils
 `xdotool` only works on X11. On Wayland compositors (GNOME 40+, Sway, Hyprland), focus detection is not yet supported. Notifications will always be shown. This is a known limitation.
 
 For Sway users, `swaymsg` support may be added in a future release.
+
+---
+
+## VS Code / Cursor integrated terminal
+
+VS Code, VS Code Insiders, and Cursor are included in the default `terminal_apps` list starting from v1.3.0. If you installed an earlier version, add the appropriate identifier to your config:
+
+| Editor | macOS bundle ID | Linux/Windows process |
+|--------|----------------|----------------------|
+| VS Code | `com.microsoft.VSCode` | `code` / `Code` |
+| VS Code Insiders | `com.microsoft.VSCodeInsiders` | `code-insiders` / `Code - Insiders` |
+| Cursor | `com.todesktop.230313mzl4w4u92` | `cursor` / `Cursor` |
+
+If you upgraded from an older version, your existing `config.json` still has the old defaults. Either add the entries manually or delete your config and re-run the installer to regenerate it.
 
 ---
 

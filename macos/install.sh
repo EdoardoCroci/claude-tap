@@ -478,7 +478,10 @@ if [ "$SHOULD_CONFIGURE" = "true" ]; then
     "co.zeit.hyper",
     "com.mitchellh.ghostty",
     "io.alacritty",
-    "dev.warp.Warp-Stable"
+    "dev.warp.Warp-Stable",
+    "com.microsoft.VSCode",
+    "com.microsoft.VSCodeInsiders",
+    "com.todesktop.230313mzl4w4u92"
   ],
 
   "rate_limits": {

@@ -523,7 +523,10 @@ if [ "$SHOULD_CONFIGURE" = "true" ]; then
     "gnome-terminal",
     "konsole",
     "xfce4-terminal",
-    "xterm"
+    "xterm",
+    "code",
+    "code-insiders",
+    "cursor"
   ],
 
   "rate_limits": {

@@ -57,6 +57,7 @@ DEFAULT_CONFIG = {
     "terminal_apps": [
         "kitty", "alacritty", "ghostty", "wezterm", "foot",
         "gnome-terminal", "konsole", "xfce4-terminal", "xterm",
+        "code", "code-insiders", "cursor",
     ],
 }
 

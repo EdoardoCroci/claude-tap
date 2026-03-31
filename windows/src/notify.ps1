@@ -29,7 +29,7 @@ $config = @{
     terminal_apps = @(
         "WindowsTerminal", "powershell", "pwsh", "cmd",
         "mintty", "git-bash", "alacritty", "ghostty",
-        "Hyper", "Warp"
+        "Hyper", "Warp", "Code", "Code - Insiders", "Cursor"
     )
     warning_threshold = 80
     critical_threshold = 90

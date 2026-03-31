@@ -40,7 +40,8 @@ skip_focused   = config.get('skip_if_focused', True)
 max_length     = config.get('message', {}).get('max_length', 300)
 terminal_apps  = config.get('terminal_apps', [
     'kitty', 'alacritty', 'ghostty', 'wezterm', 'foot',
-    'gnome-terminal', 'konsole', 'xfce4-terminal', 'xterm'
+    'gnome-terminal', 'konsole', 'xfce4-terminal', 'xterm',
+    'code', 'code-insiders', 'cursor'
 ])
 warn_threshold = config.get('rate_limits', {}).get('warning_threshold', 80)
 crit_threshold = config.get('rate_limits', {}).get('critical_threshold', 90)
@@ -116,7 +117,7 @@ print(f'FULL_MESSAGE={shlex.quote(full_message)}')
     SOUND_FILE="$CONFIG_DIR/default.wav"
     SOUND_VOLUME="0.15"
     SKIP_FOCUSED="true"
-    TERMINAL_APPS="kitty|alacritty|ghostty|wezterm|foot|gnome-terminal|konsole|xfce4-terminal|xterm"
+    TERMINAL_APPS="kitty|alacritty|ghostty|wezterm|foot|gnome-terminal|konsole|xfce4-terminal|xterm|code|code-insiders|cursor"
     WARN_THRESHOLD=80
     CRIT_THRESHOLD=90
     QUIET_ENABLED="false"
