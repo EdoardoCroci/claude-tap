@@ -455,20 +455,21 @@ class NotchOverlay: NSWindow {
         container.layer?.borderColor = borderColor.cgColor
         container.layer?.borderWidth = 0.5
 
-        // Click to dismiss, then focus terminal in the background
+        // Click to focus terminal, then dismiss
         container.onClick = { [weak self] in
-            // Dismiss immediately (while window still has focus for animation)
-            self?.dismiss()
-            // Focus terminal after a short delay so dismiss animation can start
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                let runningApps = NSWorkspace.shared.runningApplications
-                for bundleID in config.terminalApps {
-                    if let app = runningApps.first(where: { $0.bundleIdentifier == bundleID }) {
-                        app.activate(options: .activateIgnoringOtherApps)
-                        break
+            // Focus terminal via AppleScript (activates existing window, no new instance)
+            let runningApps = NSWorkspace.shared.runningApplications
+            for bundleID in config.terminalApps {
+                if runningApps.contains(where: { $0.bundleIdentifier == bundleID }) {
+                    let source = "tell application id \"\(bundleID)\" to activate"
+                    if let script = NSAppleScript(source: source) {
+                        script.executeAndReturnError(nil)
                     }
+                    break
                 }
             }
+            // Then dismiss
+            self?.dismiss()
         }
 
         // Icon - aligned with the title at the top
