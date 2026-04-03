@@ -329,6 +329,11 @@ $fBotPad = $bottomPadding.ToString($inv)
                        FontSize="12.5" FontWeight="SemiBold"
                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
 
+            <TextBlock x:Name="CloseBtn" Grid.Column="4" Grid.Row="1"
+                       Text="&#x2715;" FontSize="10" FontWeight="Medium"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Cursor="Hand" Opacity="0.5"/>
+
             <TextBlock x:Name="MessageText" Grid.Column="3" Grid.Row="3"
                        FontSize="13" TextWrapping="Wrap"
                        TextTrimming="CharacterEllipsis" VerticalAlignment="Top"/>
@@ -370,6 +375,14 @@ if ($IconPath -and (Test-Path $IconPath)) {
         # Icon load failed - continue without it
     }
 }
+
+# Close button - dismiss without focusing terminal
+$closeBtn = $window.FindName("CloseBtn")
+$closeBtn.Foreground = [System.Windows.Media.SolidColorBrush]::new($titleColor)
+$closeBtn.Add_MouseDown({
+    $_.Handled = $true
+    $window.Close()
+})
 
 # Click handler - focus terminal and close
 $window.Add_MouseDown({

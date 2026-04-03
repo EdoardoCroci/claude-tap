@@ -350,6 +350,16 @@ struct NotifStack {
     }
 }
 
+// MARK: - Close Button Helper
+
+/// Target for the close button action (prevents retain cycle issues with closures).
+class CloseButtonTarget: NSObject {
+    weak var overlay: NotchOverlay?
+    @objc func closeClicked(_ sender: Any?) {
+        overlay?.dismiss()
+    }
+}
+
 // MARK: - Notification Overlay Window
 
 /// A borderless, floating window that renders the notification overlay.
@@ -359,6 +369,8 @@ class NotchOverlay: NSWindow {
     private var isDismissing = false
     private let titleLabel = NSTextField(labelWithString: "")
     private let iconView = NSImageView()
+    private let closeButton = NSButton(frame: .zero)
+    private let closeTarget = CloseButtonTarget()
     private var isBottomPosition = false
 
     init(title: String, message: String, iconPath: String, urgency: String = "normal") {
@@ -472,6 +484,28 @@ class NotchOverlay: NSWindow {
             self?.dismiss()
         }
 
+        // Close button (✕) - dismiss without focusing terminal
+        let closeBtnSize: CGFloat = 28
+        closeButton.frame = NSRect(
+            x: expandedWidth - closeBtnSize - 6,
+            y: expandedHeight - topPadding - closeBtnSize + 6,
+            width: closeBtnSize,
+            height: closeBtnSize
+        )
+        closeButton.bezelStyle = .regularSquare
+        closeButton.isBordered = false
+        closeButton.attributedTitle = NSAttributedString(
+            string: "✕",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
+                .foregroundColor: titleColor.withAlphaComponent(0.6)
+            ]
+        )
+        closeButton.alphaValue = 0
+        closeTarget.overlay = self
+        closeButton.target = closeTarget
+        closeButton.action = #selector(CloseButtonTarget.closeClicked(_:))
+
         // Icon - aligned with the title at the top
         iconView.frame = NSRect(
             x: iconPadding,
@@ -507,6 +541,7 @@ class NotchOverlay: NSWindow {
         container.addSubview(iconView)
         container.addSubview(titleLabel)
         container.addSubview(messageLabel)
+        container.addSubview(closeButton)
         self.contentView = container
 
         // Final resting position
@@ -532,6 +567,7 @@ class NotchOverlay: NSWindow {
                 self.iconView.animator().alphaValue = 1
                 self.titleLabel.animator().alphaValue = 1
                 self.messageLabel.animator().alphaValue = 1
+                self.closeButton.animator().alphaValue = 1
             })
         }
 

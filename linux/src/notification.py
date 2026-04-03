@@ -397,6 +397,38 @@ if HAS_GTK:
             vbox.pack_start(msg_label, False, False, 0)
 
             hbox.pack_start(vbox, True, True, 0)
+
+            # Close button (✕) - dismiss without focusing terminal
+            close_btn = Gtk.Button(label="✕")
+            close_btn.set_relief(Gtk.ReliefStyle.NONE)
+            close_btn.set_valign(Gtk.Align.START)
+            close_btn.set_can_focus(False)
+            close_btn.connect("clicked", self._on_close_click)
+            # Style: small, semi-transparent, matching title color
+            close_btn_css = Gtk.CssProvider()
+            r, g, b, a = self.title_color
+            close_btn_css.load_from_data(
+                f"""
+                button {{
+                    background: transparent;
+                    border: none;
+                    box-shadow: none;
+                    padding: 0 4px;
+                    min-width: 20px;
+                    min-height: 20px;
+                    color: rgba({int(r*255)},{int(g*255)},{int(b*255)},{a*0.5});
+                    font-size: 10px;
+                }}
+                button:hover {{
+                    color: rgba({int(r*255)},{int(g*255)},{int(b*255)},{a*0.9});
+                }}
+                """.encode()
+            )
+            close_btn.get_style_context().add_provider(
+                close_btn_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+            hbox.pack_end(close_btn, False, False, 0)
+
             self.add(hbox)
 
         def _on_draw(self, widget, cr):
@@ -427,6 +459,10 @@ if HAS_GTK:
                 cr.set_source_rgba(0, 0, 0, 0)
 
             return False
+
+        def _on_close_click(self, button):
+            """Close button clicked - dismiss without focusing terminal."""
+            self._dismiss()
 
         def _on_click(self, widget, event):
             """Click to dismiss, then focus terminal in the background."""
