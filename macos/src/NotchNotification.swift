@@ -448,6 +448,34 @@ class NotchOverlay: NSWindow {
             if err == nil { return }
         }
 
+        // Accessibility-based fallback: for terminals without per-window
+        // AppleScript targeting (Ghostty, VS Code, Warp, …) enumerate the
+        // app's on-screen windows via AXUIElement and raise whichever title
+        // contains the session's cwd or its basename. First click triggers
+        // the macOS Accessibility permission prompt; denying it leaves us
+        // with the generic `activate` below.
+        if let rawCwd = parts["cwd"], let cwd = percentDecode(rawCwd), !cwd.isEmpty {
+            let bundleForProgram: [String: String] = [
+                "iterm2":         "com.googlecode.iterm2",
+                "apple_terminal": "com.apple.Terminal",
+                "ghostty":        "com.mitchellh.ghostty",
+                "vscode":         "com.microsoft.VSCode",
+                "warp":           "dev.warp.Warp-Stable"
+            ]
+            let program = parts["program"] ?? ""
+            let basename = (cwd as NSString).lastPathComponent
+
+            var bundleOrder: [String] = []
+            if let b = bundleForProgram[program] { bundleOrder.append(b) }
+            bundleOrder.append(contentsOf: fallbackApps.filter { !bundleOrder.contains($0) })
+
+            for bundleID in bundleOrder {
+                if raiseWindow(bundleID: bundleID, titleNeedles: [cwd, basename]) {
+                    return
+                }
+            }
+        }
+
         let runningApps = NSWorkspace.shared.runningApplications
         for bundleID in fallbackApps {
             if runningApps.contains(where: { $0.bundleIdentifier == bundleID }) {
@@ -458,6 +486,40 @@ class NotchOverlay: NSWindow {
                 break
             }
         }
+    }
+
+    /// Percent-decode a value encoded by notify.sh (handles %25 %3B %3D only).
+    private static func percentDecode(_ s: String) -> String? {
+        return s.removingPercentEncoding ?? s
+    }
+
+    /// Enumerate an app's on-screen windows via Accessibility and raise the
+    /// first one whose title contains any of the needles. Returns true if a
+    /// match was raised; false if the app isn't running, has no AX-visible
+    /// windows, permission is denied, or no title matches.
+    private static func raiseWindow(bundleID: String, titleNeedles: [String]) -> Bool {
+        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID }) else {
+            return false
+        }
+
+        let axApp = AXUIElementCreateApplication(app.processIdentifier)
+        var windowsValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsValue) == .success,
+              let windows = windowsValue as? [AXUIElement], !windows.isEmpty else {
+            return false
+        }
+
+        for window in windows {
+            var titleValue: AnyObject?
+            AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
+            guard let title = titleValue as? String, !title.isEmpty else { continue }
+            if titleNeedles.contains(where: { !$0.isEmpty && title.contains($0) }) {
+                AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+                app.activate(options: [])
+                return true
+            }
+        }
+        return false
     }
 
     init(title: String, message: String, iconPath: String, urgency: String = "normal", focusHint: String = "") {

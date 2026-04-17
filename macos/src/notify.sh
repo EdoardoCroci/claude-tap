@@ -99,6 +99,15 @@ else:
     message = data.get('message', 'Claude needs your attention')
     full_message = message
 
+# Capture the originating session's working directory so the click handler
+# can identify the right terminal window via window-title matching (needed
+# for terminals like Ghostty that don't expose per-window AppleScript).
+session_cwd = (
+    data.get('cwd')
+    or (data.get('workspace') or {}).get('current_dir')
+    or os.environ.get('PWD', '')
+)
+
 # Output shell variables
 print(f'NOTIF_TITLE={shlex.quote(title)}')
 print(f'NOTIF_MESSAGE={shlex.quote(message)}')
@@ -122,6 +131,7 @@ print(f'HISTORY_MAX={history_max}')
 print(f'HISTORY_DAYS={history_days}')
 print(f'HOOK_TYPE={shlex.quote(hook_type)}')
 print(f'FULL_MESSAGE={shlex.quote(full_message)}')
+print(f'SESSION_CWD={shlex.quote(session_cwd)}')
 ")" || {
     NOTIF_TITLE="Claude Code"
     NOTIF_MESSAGE="Claude needs your attention"
@@ -142,6 +152,7 @@ print(f'FULL_MESSAGE={shlex.quote(full_message)}')
     HISTORY_DAYS=30
     HOOK_TYPE="notification"
     FULL_MESSAGE=""
+    SESSION_CWD="$PWD"
 }
 
 # ──────────────────────────────────────────────────────────────
@@ -297,8 +308,11 @@ if [ "$NOTIF_ENABLED" = "true" ]; then
 
     # Build a focus hint so notch-notify can raise the ORIGINATING window on
     # click (not just bring the terminal app to the front). Format is
-    # "k=v;k=v" with keys program / session_id / tty. Values are validated
-    # against strict allowlists to block AppleScript injection.
+    # "k=v;k=v" with keys program / session_id / tty / cwd. Values are
+    # validated against strict allowlists to block AppleScript injection.
+    # cwd is the escape hatch for terminals with no per-window scripting API
+    # (Ghostty, VS Code, Warp, etc.): the Swift click handler uses the
+    # Accessibility API to raise whichever window has the cwd in its title.
     FOCUS_HINT=""
     case "$TERM_PROGRAM" in
         iTerm.app)
@@ -332,6 +346,14 @@ if [ "$NOTIF_ENABLED" = "true" ]; then
         ghostty)    FOCUS_HINT="program=ghostty" ;;
         WarpTerminal) FOCUS_HINT="program=warp" ;;
     esac
+
+    # Attach cwd for the AX title-match fallback. Semicolons aren't legal in
+    # POSIX paths in practice; the Swift side still percent-decodes to be safe.
+    if [ -n "$SESSION_CWD" ]; then
+        encoded_cwd=$(printf '%s' "$SESSION_CWD" | sed -e 's/%/%25/g' -e 's/;/%3B/g' -e 's/=/%3D/g')
+        [ -n "$FOCUS_HINT" ] || FOCUS_HINT="program=unknown"
+        FOCUS_HINT="${FOCUS_HINT};cwd=${encoded_cwd}"
+    fi
 
     "$CONFIG_DIR/notch-notify" "$NOTIF_TITLE" "$NOTIF_MESSAGE" "$ICON" "$URGENCY" "$FOCUS_HINT" &
 fi
