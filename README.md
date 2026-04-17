@@ -29,7 +29,7 @@ So I built this: a lightweight notification system that pings me with a sound an
 - **Responsive sizing** - Notification height adapts to message length (1-3 lines)
 - **Urgency tinting** - Background shifts from dark to amber (warning) to red (critical) based on your rate limit usage
 - **Rate limit warnings** - Automatic notifications when your 5-hour usage crosses configurable thresholds
-- **Click to focus** - Click any notification to dismiss it and bring your terminal to the foreground (supports Terminal, iTerm2, Ghostty, Kitty, Warp, Hyper, Alacritty, VS Code, Cursor, Windows Terminal, and more - configurable via `terminal_apps`)
+- **Click to focus (session-aware)** - Click any notification to dismiss it and raise the **specific** terminal window/tab the notification came from, not just the terminal app. iTerm2 is targeted by session UUID; Terminal.app by tty; Ghostty, VS Code, Warp, Kitty and others are targeted via macOS Accessibility (matches the window whose title contains the session's cwd). First click after install triggers a macOS Accessibility permission prompt for `notch-notify` — grant it under System Settings → Privacy & Security → Accessibility. Denying falls back to the old "activate the app generically" behaviour.
 - **Smart suppression** - Notifications are skipped when your terminal is already focused
 - **Do Not Disturb** - Scheduled quiet hours and manual DND toggle to silence notifications
 - **Notification history** - All notifications logged to a local JSON file with a built-in viewer
