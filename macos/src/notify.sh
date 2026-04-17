@@ -44,6 +44,7 @@ except:
 
 # Extract config values with defaults
 notif_enabled  = config.get('notification', {}).get('enabled', True)
+show_on_waiting = config.get('notification', {}).get('show_on_waiting', False)
 sound_enabled  = config.get('sound', {}).get('enabled', True)
 sound_file     = config.get('sound', {}).get('file', '~/.config/claude-tap/default.wav')
 sound_volume   = config.get('sound', {}).get('volume', 0.15)
@@ -102,6 +103,7 @@ else:
 print(f'NOTIF_TITLE={shlex.quote(title)}')
 print(f'NOTIF_MESSAGE={shlex.quote(message)}')
 print(f'NOTIF_ENABLED={shlex.quote(str(notif_enabled).lower())}')
+print(f'SHOW_ON_WAITING={shlex.quote(str(show_on_waiting).lower())}')
 print(f'SOUND_ENABLED={shlex.quote(str(sound_enabled).lower())}')
 print(f'SOUND_FILE={shlex.quote(sound_file)}')
 print(f'SOUND_VOLUME={shlex.quote(str(sound_volume))}')
@@ -124,6 +126,7 @@ print(f'FULL_MESSAGE={shlex.quote(full_message)}')
     NOTIF_TITLE="Claude Code"
     NOTIF_MESSAGE="Claude needs your attention"
     NOTIF_ENABLED="true"
+    SHOW_ON_WAITING="false"
     SOUND_ENABLED="true"
     SOUND_FILE="$CONFIG_DIR/default.wav"
     SOUND_VOLUME="0.15"
@@ -144,6 +147,12 @@ print(f'FULL_MESSAGE={shlex.quote(full_message)}')
 # ──────────────────────────────────────────────────────────────
 # Skip if terminal is focused (for Stop events only)
 # ──────────────────────────────────────────────────────────────
+
+# Suppress Notification-hook events (idle "waiting for input", permission prompts)
+# entirely when show_on_waiting is off — no sound, no overlay, no history entry.
+if [ "$HOOK_TYPE" = "notification" ] && [ "$SHOW_ON_WAITING" != "true" ]; then
+    exit 0
+fi
 
 if [ "$SKIP_FOCUSED" = "true" ] && [ "$NOTIF_TITLE" = "Task Complete" ]; then
     FRONTMOST=$(osascript -e 'tell application "System Events" to get bundle identifier of first process whose frontmost is true' 2>/dev/null)

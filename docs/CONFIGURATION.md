@@ -99,6 +99,14 @@ Time boundaries in 24-hour format. Day theme is active from `day_start` to `nigh
 
 Set to `false` to disable the visual notification overlay entirely. Sound will still play if `sound.enabled` is `true`.
 
+### notification.show_on_waiting
+
+| Type | Default |
+|------|---------|
+| boolean | `false` |
+
+Controls notifications fired by Claude Code's `Notification` hook — idle "Claude is waiting for your input" prompts and tool-permission prompts. Leave `false` (default) to suppress them entirely (no sound, no overlay, no history entry); `Stop` events (task completion) are unaffected. Set to `true` to restore the previous behaviour where every `Notification` hook event produced an overlay.
+
 ### notification.position
 
 | Type | Default |
@@ -393,7 +401,7 @@ Show the context window usage percentage with a 10-block progress bar. Colors sh
 |------|---------|
 | boolean | `true` |
 
-Show the 5-hour rolling rate limit usage with a countdown to reset. This section also triggers rate limit warning notifications.
+Show the 5-hour rolling rate limit usage with a countdown and absolute reset clock time. Format: `2h34m · 15:00` when the reset is under 24 hours away, or `3d4h17m · Thu 22:00` when further out. This section also triggers rate limit warning notifications.
 
 ### status_line.show_rate_7d
 
@@ -401,7 +409,7 @@ Show the 5-hour rolling rate limit usage with a countdown to reset. This section
 |------|---------|
 | boolean | `true` |
 
-Show the 7-day rolling rate limit usage with a countdown to reset. Countdowns use the format `2h34m` for under 24 hours, or `3d4h17m` for longer durations.
+Show the 7-day rolling rate limit usage with a countdown and absolute reset clock time. Format: `2h34m · 15:00` when the reset is under 24 hours away, or `3d4h17m · Thu 22:00` when further out.
 
 ### status_line.show_lines_changed
 
@@ -410,6 +418,14 @@ Show the 7-day rolling rate limit usage with a countdown to reset. Countdowns us
 | boolean | `true` |
 
 Show lines added (green) and removed (red) in the current session.
+
+### status_line.show_git_branch
+
+| Type | Default |
+|------|---------|
+| boolean | `true` |
+
+Show the current git branch (or short SHA in detached HEAD) for the session's working directory. Suppressed silently when outside a git repository or when `git` is not installed.
 
 ---
 

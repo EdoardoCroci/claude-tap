@@ -1,6 +1,7 @@
 {
   "notification": {
     "enabled": true,
+    "show_on_waiting": false,
     "position": "top-center",
     "width": 380,
     "max_lines": 3,
@@ -64,7 +65,8 @@
     "show_context_bar": true,
     "show_rate_5h": true,
     "show_rate_7d": true,
-    "show_lines_changed": true
+    "show_lines_changed": true,
+    "show_git_branch": true
   },
 
   "message": {

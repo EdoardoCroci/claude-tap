@@ -41,12 +41,14 @@ $sevenDay = $data.rate_limits.seven_day.used_percentage
 $sevenDayResets = $data.rate_limits.seven_day.resets_at
 $linesAdded = $data.cost.total_lines_added
 $linesRemoved = $data.cost.total_lines_removed
+$cwd = $data.workspace.current_dir
+if (-not $cwd) { $cwd = (Get-Location).Path }
 
 # ──────────────────────────────────────────────────────────────
 # Read config
 # ──────────────────────────────────────────────────────────────
 
-$sl = @{ enabled = $true; show_context_bar = $true; show_rate_5h = $true; show_rate_7d = $true; show_lines_changed = $true }
+$sl = @{ enabled = $true; show_context_bar = $true; show_rate_5h = $true; show_rate_7d = $true; show_lines_changed = $true; show_git_branch = $true }
 $warnThreshold = 80
 $critThreshold = 90
 $quietEnabled = $false
@@ -61,6 +63,7 @@ if (Test-Path $ConfigFile) {
         if ($null -ne $json.status_line.show_rate_5h) { $sl.show_rate_5h = $json.status_line.show_rate_5h }
         if ($null -ne $json.status_line.show_rate_7d) { $sl.show_rate_7d = $json.status_line.show_rate_7d }
         if ($null -ne $json.status_line.show_lines_changed) { $sl.show_lines_changed = $json.status_line.show_lines_changed }
+        if ($null -ne $json.status_line.show_git_branch) { $sl.show_git_branch = $json.status_line.show_git_branch }
         if ($null -ne $json.rate_limits.warning_threshold) { $warnThreshold = [int]$json.rate_limits.warning_threshold }
         if ($null -ne $json.rate_limits.critical_threshold) { $critThreshold = [int]$json.rate_limits.critical_threshold }
         if ($null -ne $json.quiet_hours.enabled) { $quietEnabled = $json.quiet_hours.enabled }
@@ -100,13 +103,18 @@ function Format-ResetCountdown($resetsAt) {
     $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     $diff = [int]$resetsAt - $now
     if ($diff -le 0) { return "" }
-    $days = [Math]::Floor($diff / 86400)
+    $days  = [Math]::Floor($diff / 86400)
     $hours = [Math]::Floor(($diff % 86400) / 3600)
-    $mins = [Math]::Floor(($diff % 3600) / 60)
+    $mins  = [Math]::Floor(($diff % 3600) / 60)
+    $local = [DateTimeOffset]::FromUnixTimeSeconds([int64]$resetsAt).LocalDateTime
     if ($days -gt 0) {
-        return "${days}d${hours}h${mins}m"
+        $duration = "${days}d${hours}h${mins}m"
+        $clock = $local.ToString("ddd HH:mm", [System.Globalization.CultureInfo]::InvariantCulture)
+    } else {
+        $duration = "${hours}h${mins}m"
+        $clock = $local.ToString("HH:mm")
     }
-    return "${hours}h${mins}m"
+    return "$duration $([char]0x00B7) $clock"
 }
 
 # ──────────────────────────────────────────────────────────────
@@ -114,6 +122,13 @@ function Format-ResetCountdown($resetsAt) {
 # ──────────────────────────────────────────────────────────────
 
 $parts = @()
+
+# Git branch (or short SHA in detached HEAD)
+if ($sl.show_git_branch -and $cwd -and (Get-Command git -ErrorAction SilentlyContinue)) {
+    $branch = & git -C $cwd symbolic-ref --short HEAD 2>$null
+    if (-not $branch) { $branch = & git -C $cwd rev-parse --short HEAD 2>$null }
+    if ($branch) { $parts += "${GRAY}$([char]0x238B) ${branch}${RESET}" }
+}
 
 # Context bar
 if ($sl.show_context_bar -and $null -ne $usedPct) {

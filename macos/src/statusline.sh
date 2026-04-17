@@ -47,6 +47,8 @@ seven_day=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // emp
 seven_day_resets=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty')
 lines_added=$(echo "$input" | jq -r '.cost.total_lines_added // empty')
 lines_removed=$(echo "$input" | jq -r '.cost.total_lines_removed // empty')
+cwd=$(echo "$input" | jq -r '.workspace.current_dir // empty')
+[ -z "$cwd" ] && cwd="$PWD"
 
 # ──────────────────────────────────────────────────────────────
 # Read config toggles (via python3 for JSON parsing)
@@ -68,6 +70,7 @@ print(f'SHOW_CTX={shlex.quote(str(sl.get(\"show_context_bar\", True)).lower())}'
 print(f'SHOW_5H={shlex.quote(str(sl.get(\"show_rate_5h\", True)).lower())}')
 print(f'SHOW_7D={shlex.quote(str(sl.get(\"show_rate_7d\", True)).lower())}')
 print(f'SHOW_LINES={shlex.quote(str(sl.get(\"show_lines_changed\", True)).lower())}')
+print(f'SHOW_GIT={shlex.quote(str(sl.get(\"show_git_branch\", True)).lower())}')
 print(f'WARN_THRESHOLD={shlex.quote(str(int(rl.get(\"warning_threshold\", 80))))}')
 print(f'CRIT_THRESHOLD={shlex.quote(str(int(rl.get(\"critical_threshold\", 90))))}')
 snd = c.get('sound', {})
@@ -91,6 +94,7 @@ print(f'QUIET_END={shlex.quote(quiet_end)}')
     SHOW_5H="true"
     SHOW_7D="true"
     SHOW_LINES="true"
+    SHOW_GIT="true"
     WARN_THRESHOLD=80
     CRIT_THRESHOLD=90
     SND_ENABLED="true"
@@ -134,25 +138,29 @@ pct_color() {
   fi
 }
 
-# Formats a Unix epoch timestamp as a human-readable countdown (e.g., "2h34m")
+# Formats a Unix epoch timestamp as "<countdown> · <local clock>"
+# (e.g. "2h34m · 15:00", or "3d4h17m · Thu 22:00" when ≥24h away).
 format_reset() {
   local resets_at="$1"
-  if [ -n "$resets_at" ]; then
-    local now resets_sec diff
-    now=$(date +%s)
-    resets_sec=$(printf '%.0f' "$resets_at")
-    diff=$((resets_sec - now))
-    if [ "$diff" -gt 0 ]; then
-      local days=$((diff / 86400))
-      local hours=$(( (diff % 86400) / 3600 ))
-      local mins=$(( (diff % 3600) / 60 ))
-      if [ "$days" -gt 0 ]; then
-        echo "${days}d${hours}h${mins}m"
-      else
-        echo "${hours}h${mins}m"
-      fi
-    fi
+  [ -z "$resets_at" ] && return
+  local now resets_sec diff
+  now=$(date +%s)
+  resets_sec=$(printf '%.0f' "$resets_at")
+  diff=$((resets_sec - now))
+  [ "$diff" -le 0 ] && return
+
+  local days=$((diff / 86400))
+  local hours=$(( (diff % 86400) / 3600 ))
+  local mins=$(( (diff % 3600) / 60 ))
+  local duration clock
+  if [ "$days" -gt 0 ]; then
+    duration="${days}d${hours}h${mins}m"
+    clock=$(date -r "$resets_sec" +"%a %H:%M")
+  else
+    duration="${hours}h${mins}m"
+    clock=$(date -r "$resets_sec" +"%H:%M")
   fi
+  echo "${duration} · ${clock}"
 }
 
 # ──────────────────────────────────────────────────────────────
@@ -176,6 +184,16 @@ if [ "$SHOW_CTX" = "true" ] && [ -n "$used_pct" ]; then
   ctx_part="${BAR_COLOR}${pct_int}%${RESET} ${BAR_COLOR}${bar}${RESET}"
 elif [ "$SHOW_CTX" = "true" ]; then
   ctx_part="${DIM}ctx: n/a${RESET}"
+fi
+
+# Git branch (or short SHA in detached HEAD)
+git_part=""
+if [ "$SHOW_GIT" = "true" ] && [ -n "$cwd" ] && command -v git >/dev/null 2>&1; then
+  if branch=$(git -C "$cwd" symbolic-ref --short HEAD 2>/dev/null); then
+    git_part="${GRAY}⎇ ${branch}${RESET}"
+  elif sha=$(git -C "$cwd" rev-parse --short HEAD 2>/dev/null); then
+    git_part="${GRAY}⎇ ${sha}${RESET}"
+  fi
 fi
 
 # 5-hour rate limit with reset countdown
@@ -269,6 +287,7 @@ fi
 # ──────────────────────────────────────────────────────────────
 
 out="${BOLD}${ORANGE}${model}${RESET}"
+[ -n "$git_part" ]     && out="${out} ${GRAY}│${RESET} ${git_part}"
 [ -n "$ctx_part" ]     && out="${out} ${GRAY}│${RESET} ${ctx_part}"
 [ -n "$rate_5h_part" ] && out="${out} ${GRAY}│${RESET} ${rate_5h_part}"
 [ -n "$rate_7d_part" ] && out="${out} ${GRAY}│${RESET} ${rate_7d_part}"

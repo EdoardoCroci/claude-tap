@@ -21,6 +21,7 @@ $ConfigFile = Join-Path $ConfigDir "config.json"
 
 $config = @{
     notification_enabled = $true
+    show_on_waiting = $false
     sound_enabled = $true
     sound_file = (Join-Path $ConfigDir "default.wav")
     sound_volume = 0.15
@@ -49,6 +50,7 @@ if (Test-Path $ConfigFile) {
         $json = Get-Content $ConfigFile -Raw | ConvertFrom-Json
 
         if ($null -ne $json.notification.enabled) { $config.notification_enabled = $json.notification.enabled }
+        if ($null -ne $json.notification.show_on_waiting) { $config.show_on_waiting = $json.notification.show_on_waiting }
         if ($null -ne $json.sound.enabled) { $config.sound_enabled = $json.sound.enabled }
         if ($json.sound.file) {
             $sf = $json.sound.file -replace '^~', $env:LOCALAPPDATA
@@ -108,6 +110,12 @@ if ($inputJson -and $null -ne $inputJson.last_assistant_message) {
     $NotifTitle = if ($inputJson -and $inputJson.title) { $inputJson.title } else { "Claude Code" }
     $NotifMessage = if ($inputJson -and $inputJson.message) { $inputJson.message } else { "Claude needs your attention" }
     $FullMessage = $NotifMessage
+}
+
+# Suppress Notification-hook events (idle "waiting for input", permission prompts)
+# entirely when show_on_waiting is off — no sound, no overlay, no history entry.
+if ($HookType -eq "notification" -and -not $config.show_on_waiting) {
+    exit 0
 }
 
 # ──────────────────────────────────────────────────────────────

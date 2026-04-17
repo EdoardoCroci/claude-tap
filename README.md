@@ -252,6 +252,7 @@ Edit `~/.config/claude-tap/config.json` to customize. **Changes take effect imme
 | `status_line.show_rate_5h` | `true` | Show 5-hour rate limit |
 | `status_line.show_rate_7d` | `true` | Show 7-day rate limit |
 | `status_line.show_lines_changed` | `true` | Show lines added/removed |
+| `status_line.show_git_branch` | `true` | Show current git branch |
 
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the complete reference.
 
