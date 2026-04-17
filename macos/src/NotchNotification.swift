@@ -164,9 +164,14 @@ struct NotifierConfig {
 
 // MARK: - Clickable View
 
-/// A simple NSView that responds to mouse clicks with a callback.
+/// An NSView that reports clicks and hover enter/exit via callbacks. Hover
+/// events are used by NotchOverlay to pause the auto-dismiss timer while the
+/// user is reading the notification.
 class ClickableView: NSView {
     var onClick: (() -> Void)?
+    var onMouseEntered: (() -> Void)?
+    var onMouseExited: (() -> Void)?
+    private var hoverTrackingArea: NSTrackingArea?
 
     override func mouseDown(with event: NSEvent) {
         onClick?()
@@ -175,6 +180,22 @@ class ClickableView: NSView {
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .pointingHand)
     }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = hoverTrackingArea { removeTrackingArea(existing) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        hoverTrackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { onMouseEntered?() }
+    override func mouseExited(with event: NSEvent) { onMouseExited?() }
 }
 
 // MARK: - Markdown Parser
@@ -378,6 +399,8 @@ class NotchOverlay: NSWindow {
     private let closeButton = NSButton(frame: .zero)
     private let closeTarget = CloseButtonTarget()
     private var isBottomPosition = false
+    private var dismissWorkItem: DispatchWorkItem?
+    private var dismissDuration: Double = 5.5
 
     /// Parse a "k=v;k=v" focus hint and raise the originating window/tab.
     /// Falls back to a generic `activate` on the first running terminal in
@@ -625,6 +648,11 @@ class NotchOverlay: NSWindow {
             self?.dismiss()
         }
 
+        // Pause the auto-dismiss timer while the user is hovering. Mouse exit
+        // reschedules a fresh duration so the next read-through gets full time.
+        container.onMouseEntered = { [weak self] in self?.cancelAutoDismiss() }
+        container.onMouseExited  = { [weak self] in self?.scheduleAutoDismiss() }
+
         // Close button (✕) - dismiss without focusing terminal
         let closeBtnSize: CGFloat = 28
         closeButton.frame = NSRect(
@@ -712,10 +740,23 @@ class NotchOverlay: NSWindow {
             })
         }
 
-        // Auto-dismiss after configured duration
-        DispatchQueue.main.asyncAfter(deadline: .now() + config.durationSeconds) {
-            self.dismiss()
-        }
+        // Auto-dismiss after configured duration (pauseable via hover)
+        self.dismissDuration = config.durationSeconds
+        scheduleAutoDismiss()
+    }
+
+    /// (Re)start the auto-dismiss countdown. Cancels any pending timer first.
+    private func scheduleAutoDismiss() {
+        dismissWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.dismiss() }
+        dismissWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + dismissDuration, execute: work)
+    }
+
+    /// Pause the auto-dismiss countdown (used while the overlay is hovered).
+    private func cancelAutoDismiss() {
+        dismissWorkItem?.cancel()
+        dismissWorkItem = nil
     }
 
     /// Animate out: slide away from screen edge + fade, then terminate.
@@ -745,6 +786,17 @@ class NotchOverlay: NSWindow {
 // MARK: - Entry Point
 
 let args = CommandLine.arguments
+
+// Install-time hook: trigger the macOS Accessibility permission prompt so
+// the user sees it in a sensible context (right after running setup) rather
+// than the first time they click a notification. Exits 0 if already trusted,
+// 1 otherwise — callers are expected to treat both as non-fatal.
+if args.contains("--request-accessibility") {
+    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+    let trusted = AXIsProcessTrustedWithOptions(options as CFDictionary)
+    exit(trusted ? 0 : 1)
+}
+
 let title = args.count > 1 ? args[1] : "Claude Code"
 let message = args.count > 2 ? args[2] : "Needs your attention"
 let iconPath = args.count > 3 ? args[3] : ""

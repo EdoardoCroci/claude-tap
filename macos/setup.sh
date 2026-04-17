@@ -120,6 +120,20 @@ if command -v swiftc &>/dev/null; then
         2>&1; then
         chmod +x "$CONFIG_DIR/notch-notify"
         _success "Binary compiled"
+
+        # Trigger the Accessibility permission prompt now (the binary uses AX
+        # to raise the originating terminal window on click). Doing this here
+        # gives the user the prompt during install where it's expected,
+        # instead of on a random future click. Quiet no-op if already trusted.
+        if [ -z "${CLAUDE_TAP_QUIET_SETUP:-}" ]; then
+            if "$CONFIG_DIR/notch-notify" --request-accessibility >/dev/null 2>&1; then
+                _success "Accessibility permission already granted"
+            else
+                _info "Accessibility permission needed for session-aware click-to-focus."
+                _info "  macOS should have shown a prompt — if you missed it, enable"
+                _info "  'notch-notify' under System Settings → Privacy & Security → Accessibility."
+            fi
+        fi
     else
         _warn "Swift compilation failed. Notification overlay will not work."
         _warn "Run 'xcode-select --install' and re-run this script."
