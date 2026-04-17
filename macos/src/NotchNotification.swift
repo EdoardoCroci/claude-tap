@@ -11,9 +11,15 @@
 // All values have sensible defaults - the binary works even without a config file.
 //
 // Usage:
-//   notch-notify <title> <message> [icon_path] [urgency]
+//   notch-notify <title> <message> [icon_path] [urgency] [focus_hint]
 //
 //   urgency: "normal" (default), "warning", or "critical"
+//   focus_hint: "k=v;k=v" string describing the originating terminal session,
+//               used on click to raise the exact window/tab. Keys:
+//                 program    — iterm2 | apple_terminal | vscode | ghostty | warp
+//                 session_id — iTerm2 session UUID (hex and dashes only)
+//                 tty        — /dev/ttysNNN path (for Terminal.app)
+//               Unrecognized or missing values fall back to generic app activation.
 
 import AppKit
 
@@ -373,7 +379,88 @@ class NotchOverlay: NSWindow {
     private let closeTarget = CloseButtonTarget()
     private var isBottomPosition = false
 
-    init(title: String, message: String, iconPath: String, urgency: String = "normal") {
+    /// Parse a "k=v;k=v" focus hint and raise the originating window/tab.
+    /// Falls back to a generic `activate` on the first running terminal in
+    /// `fallbackApps` when the hint is empty, the program is unknown, or the
+    /// targeted AppleScript fails (e.g. the tab has since closed).
+    static func focusTerminal(hint: String, fallbackApps: [String]) {
+        var parts: [String: String] = [:]
+        for seg in hint.split(separator: ";") {
+            let kv = seg.split(separator: "=", maxSplits: 1).map(String.init)
+            if kv.count == 2 { parts[kv[0]] = kv[1] }
+        }
+
+        // Belt-and-suspenders sanitization against AppleScript injection: hint
+        // values originate from env vars set by the user's terminal, which are
+        // usually benign, but we still allow only narrow character classes.
+        let uuidRegex = try? NSRegularExpression(pattern: "^[A-Fa-f0-9-]+$")
+        let ttyRegex  = try? NSRegularExpression(pattern: "^/dev/ttys[0-9]+$")
+        func matches(_ re: NSRegularExpression?, _ s: String) -> Bool {
+            guard let re = re else { return false }
+            let range = NSRange(s.startIndex..., in: s)
+            return re.firstMatch(in: s, options: [], range: range) != nil
+        }
+
+        var targeted: String? = nil
+        switch parts["program"] ?? "" {
+        case "iterm2":
+            if let sid = parts["session_id"], matches(uuidRegex, sid) {
+                targeted = """
+                tell application "iTerm2"
+                    activate
+                    repeat with theWindow in windows
+                        repeat with theTab in tabs of theWindow
+                            repeat with theSession in sessions of theTab
+                                if id of theSession is "\(sid)" then
+                                    select theSession
+                                    return
+                                end if
+                            end repeat
+                        end repeat
+                    end repeat
+                end tell
+                """
+            }
+        case "apple_terminal":
+            if let tty = parts["tty"], matches(ttyRegex, tty) {
+                targeted = """
+                tell application "Terminal"
+                    activate
+                    repeat with theWindow in windows
+                        repeat with theTab in tabs of theWindow
+                            if tty of theTab is "\(tty)" then
+                                set selected of theTab to true
+                                set index of theWindow to 1
+                                return
+                            end if
+                        end repeat
+                    end repeat
+                end tell
+                """
+            }
+        default:
+            break
+        }
+
+        if let source = targeted, let script = NSAppleScript(source: source) {
+            var err: NSDictionary?
+            script.executeAndReturnError(&err)
+            if err == nil { return }
+        }
+
+        let runningApps = NSWorkspace.shared.runningApplications
+        for bundleID in fallbackApps {
+            if runningApps.contains(where: { $0.bundleIdentifier == bundleID }) {
+                let source = "tell application id \"\(bundleID)\" to activate"
+                if let script = NSAppleScript(source: source) {
+                    script.executeAndReturnError(nil)
+                }
+                break
+            }
+        }
+    }
+
+    init(title: String, message: String, iconPath: String, urgency: String = "normal", focusHint: String = "") {
         let config = NotifierConfig.load()
 
         // If notifications are disabled, exit immediately
@@ -467,20 +554,12 @@ class NotchOverlay: NSWindow {
         container.layer?.borderColor = borderColor.cgColor
         container.layer?.borderWidth = 0.5
 
-        // Click to focus terminal, then dismiss
+        // Click to focus the originating terminal window/tab, then dismiss.
+        // When a focus hint is available we target the specific session; otherwise
+        // we fall back to bringing the terminal app generically to the front.
+        let capturedHint = focusHint
         container.onClick = { [weak self] in
-            // Focus terminal via AppleScript (activates existing window, no new instance)
-            let runningApps = NSWorkspace.shared.runningApplications
-            for bundleID in config.terminalApps {
-                if runningApps.contains(where: { $0.bundleIdentifier == bundleID }) {
-                    let source = "tell application id \"\(bundleID)\" to activate"
-                    if let script = NSAppleScript(source: source) {
-                        script.executeAndReturnError(nil)
-                    }
-                    break
-                }
-            }
-            // Then dismiss
+            NotchOverlay.focusTerminal(hint: capturedHint, fallbackApps: config.terminalApps)
             self?.dismiss()
         }
 
@@ -608,10 +687,11 @@ let title = args.count > 1 ? args[1] : "Claude Code"
 let message = args.count > 2 ? args[2] : "Needs your attention"
 let iconPath = args.count > 3 ? args[3] : ""
 let urgency = args.count > 4 ? args[4] : "normal"
+let focusHint = args.count > 5 ? args[5] : ""
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)  // No dock icon
 
-let _ = NotchOverlay(title: title, message: message, iconPath: iconPath, urgency: urgency)
+let _ = NotchOverlay(title: title, message: message, iconPath: iconPath, urgency: urgency, focusHint: focusHint)
 
 app.run()

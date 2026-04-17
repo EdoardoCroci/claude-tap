@@ -294,5 +294,44 @@ if [ "$NOTIF_ENABLED" = "true" ]; then
     else
         ICON="$CONFIG_DIR/claude-icon.png"
     fi
-    "$CONFIG_DIR/notch-notify" "$NOTIF_TITLE" "$NOTIF_MESSAGE" "$ICON" "$URGENCY" &
+
+    # Build a focus hint so notch-notify can raise the ORIGINATING window on
+    # click (not just bring the terminal app to the front). Format is
+    # "k=v;k=v" with keys program / session_id / tty. Values are validated
+    # against strict allowlists to block AppleScript injection.
+    FOCUS_HINT=""
+    case "$TERM_PROGRAM" in
+        iTerm.app)
+            FOCUS_HINT="program=iterm2"
+            if [ -n "$ITERM_SESSION_ID" ]; then
+                # ITERM_SESSION_ID is "w<N>t<N>p<N>:<UUID>" — keep only the UUID.
+                uuid="${ITERM_SESSION_ID##*:}"
+                if [[ "$uuid" =~ ^[A-Fa-f0-9-]+$ ]]; then
+                    FOCUS_HINT="${FOCUS_HINT};session_id=${uuid}"
+                fi
+            fi
+            ;;
+        Apple_Terminal)
+            FOCUS_HINT="program=apple_terminal"
+            # Walk up the process tree to find the first ancestor with a real tty
+            # (the shell inside the tab). notify.sh itself may have no ctty.
+            probe_pid=$$
+            while [ "$probe_pid" -gt 1 ]; do
+                probe_tty=$(ps -o tty= -p "$probe_pid" 2>/dev/null | tr -d ' ')
+                if [ -n "$probe_tty" ] && [ "$probe_tty" != "??" ]; then
+                    if [[ "$probe_tty" =~ ^ttys[0-9]+$ ]]; then
+                        FOCUS_HINT="${FOCUS_HINT};tty=/dev/${probe_tty}"
+                    fi
+                    break
+                fi
+                probe_pid=$(ps -o ppid= -p "$probe_pid" 2>/dev/null | tr -d ' ')
+                [ -z "$probe_pid" ] && break
+            done
+            ;;
+        vscode)     FOCUS_HINT="program=vscode" ;;
+        ghostty)    FOCUS_HINT="program=ghostty" ;;
+        WarpTerminal) FOCUS_HINT="program=warp" ;;
+    esac
+
+    "$CONFIG_DIR/notch-notify" "$NOTIF_TITLE" "$NOTIF_MESSAGE" "$ICON" "$URGENCY" "$FOCUS_HINT" &
 fi
