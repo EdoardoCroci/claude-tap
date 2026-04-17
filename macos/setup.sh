@@ -21,9 +21,21 @@ while [ -L "$SELF" ]; do
     SELF="$(readlink "$SELF")"
     [[ "$SELF" != /* ]] && SELF="$DIR/$SELF"
 done
-BASE_DIR="${1:-$(cd "$(dirname "$SELF")/.." && pwd)}"
+# First non-flag positional arg is BASE_DIR; otherwise derive it from this
+# script's own location. This lets `claude-tap-setup --quiet` work without
+# the flag being misread as a directory path.
+BASE_DIR=""
 QUIET=""
-for arg in "$@"; do [ "$arg" = "--quiet" ] && QUIET="1"; done
+for arg in "$@"; do
+    case "$arg" in
+        --quiet) QUIET="1" ;;
+        -*)      ;;  # ignore other flags here; preserved for future use
+        *)       [ -z "$BASE_DIR" ] && BASE_DIR="$arg" ;;
+    esac
+done
+if [ -z "$BASE_DIR" ]; then
+    BASE_DIR="$(cd "$(dirname "$SELF")/.." && pwd)"
+fi
 
 CONFIG_DIR="$HOME/.config/claude-tap"
 CLAUDE_DIR="$HOME/.claude"
