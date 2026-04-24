@@ -2,6 +2,8 @@
   "notification": {
     "enabled": true,
     "show_on_waiting": false,
+    "show_on_permission": true,
+    "dedup_window_secs": 2,
     "position": "top-center",
     "width": 380,
     "max_lines": 3,

@@ -22,6 +22,7 @@ $ConfigFile = Join-Path $ConfigDir "config.json"
 $config = @{
     notification_enabled = $true
     show_on_waiting = $false
+    show_on_permission = $true
     sound_enabled = $true
     sound_file = (Join-Path $ConfigDir "default.wav")
     sound_volume = 0.15
@@ -51,6 +52,7 @@ if (Test-Path $ConfigFile) {
 
         if ($null -ne $json.notification.enabled) { $config.notification_enabled = $json.notification.enabled }
         if ($null -ne $json.notification.show_on_waiting) { $config.show_on_waiting = $json.notification.show_on_waiting }
+        if ($null -ne $json.notification.show_on_permission) { $config.show_on_permission = $json.notification.show_on_permission }
         if ($null -ne $json.sound.enabled) { $config.sound_enabled = $json.sound.enabled }
         if ($json.sound.file) {
             $sf = $json.sound.file -replace '^~', $env:LOCALAPPDATA
@@ -112,10 +114,25 @@ if ($inputJson -and $null -ne $inputJson.last_assistant_message) {
     $FullMessage = $NotifMessage
 }
 
-# Suppress Notification-hook events (idle "waiting for input", permission prompts)
-# entirely when show_on_waiting is off — no sound, no overlay, no history entry.
-if ($HookType -eq "notification" -and -not $config.show_on_waiting) {
-    exit 0
+# Classify Notification subtype: permission prompt vs idle-waiting ping.
+# Unknown messages fall through to 'permission' to avoid regressing
+# attention-required events if Claude Code introduces new wording.
+$NotifSubtype = ""
+if ($HookType -eq "notification") {
+    if ($NotifMessage -match '(?i)permission') {
+        $NotifSubtype = "permission"
+    } elseif ($NotifMessage -match '(?i)waiting for your input') {
+        $NotifSubtype = "waiting"
+    } else {
+        $NotifSubtype = "permission"
+    }
+}
+
+# Suppress based on subtype. Permission prompts are shown by default (blocking);
+# idle "waiting for input" pings are suppressed by default (re-fire every ~60s).
+if ($HookType -eq "notification") {
+    if ($NotifSubtype -eq "waiting" -and -not $config.show_on_waiting) { exit 0 }
+    if ($NotifSubtype -eq "permission" -and -not $config.show_on_permission) { exit 0 }
 }
 
 # ──────────────────────────────────────────────────────────────

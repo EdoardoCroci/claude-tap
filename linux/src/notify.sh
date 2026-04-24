@@ -34,6 +34,8 @@ except:
 # Extract config values with defaults
 notif_enabled  = config.get('notification', {}).get('enabled', True)
 show_on_waiting = config.get('notification', {}).get('show_on_waiting', False)
+show_on_permission = config.get('notification', {}).get('show_on_permission', True)
+dedup_window = int(config.get('notification', {}).get('dedup_window_secs', 2))
 sound_enabled  = config.get('sound', {}).get('enabled', True)
 sound_file     = config.get('sound', {}).get('file', '~/.config/claude-tap/default.wav')
 sound_volume   = config.get('sound', {}).get('volume', 0.15)
@@ -72,6 +74,7 @@ except:
 if 'last_assistant_message' in data:
     # Stop hook: Claude finished responding
     hook_type = 'stop'
+    notif_subtype = ''
     title = 'Task Complete'
     msg = data['last_assistant_message'] or ''
     # Collapse multiple lines into one, truncate to configured max length
@@ -87,12 +90,24 @@ else:
     title = data.get('title', 'Claude Code')
     message = data.get('message', 'Claude needs your attention')
     full_message = message
+    # Classify subtype: permission vs idle-waiting. Unknown messages fall
+    # through to 'permission' to avoid regressing attention-required events.
+    _msg_lc = message.lower()
+    if 'permission' in _msg_lc:
+        notif_subtype = 'permission'
+    elif 'waiting for your input' in _msg_lc:
+        notif_subtype = 'waiting'
+    else:
+        notif_subtype = 'permission'
 
 # Output shell variables
 print(f'NOTIF_TITLE={shlex.quote(title)}')
 print(f'NOTIF_MESSAGE={shlex.quote(message)}')
 print(f'NOTIF_ENABLED={shlex.quote(str(notif_enabled).lower())}')
 print(f'SHOW_ON_WAITING={shlex.quote(str(show_on_waiting).lower())}')
+print(f'SHOW_ON_PERMISSION={shlex.quote(str(show_on_permission).lower())}')
+print(f'NOTIF_SUBTYPE={shlex.quote(notif_subtype)}')
+print(f'DEDUP_WINDOW={shlex.quote(str(dedup_window))}')
 print(f'SOUND_ENABLED={shlex.quote(str(sound_enabled).lower())}')
 print(f'SOUND_FILE={shlex.quote(sound_file)}')
 print(f'SOUND_VOLUME={shlex.quote(str(sound_volume))}')
@@ -116,6 +131,9 @@ print(f'FULL_MESSAGE={shlex.quote(full_message)}')
     NOTIF_MESSAGE="Claude needs your attention"
     NOTIF_ENABLED="true"
     SHOW_ON_WAITING="false"
+    SHOW_ON_PERMISSION="true"
+    NOTIF_SUBTYPE="permission"
+    DEDUP_WINDOW="2"
     SOUND_ENABLED="true"
     SOUND_FILE="$CONFIG_DIR/default.wav"
     SOUND_VOLUME="0.15"
@@ -137,10 +155,39 @@ print(f'FULL_MESSAGE={shlex.quote(full_message)}')
 # Skip if terminal is focused (for Stop events only)
 # ──────────────────────────────────────────────────────────────
 
-# Suppress Notification-hook events (idle "waiting for input", permission prompts)
-# entirely when show_on_waiting is off — no sound, no overlay, no history entry.
-if [ "$HOOK_TYPE" = "notification" ] && [ "$SHOW_ON_WAITING" != "true" ]; then
-    exit 0
+# Suppress Notification-hook events based on subtype. Permission prompts are
+# shown by default (blocking); idle "waiting for input" pings are suppressed
+# by default since they re-fire every ~60s.
+if [ "$HOOK_TYPE" = "notification" ]; then
+    if [ "$NOTIF_SUBTYPE" = "waiting" ] && [ "$SHOW_ON_WAITING" != "true" ]; then
+        exit 0
+    fi
+    if [ "$NOTIF_SUBTYPE" = "permission" ] && [ "$SHOW_ON_PERMISSION" != "true" ]; then
+        exit 0
+    fi
+fi
+
+# ──────────────────────────────────────────────────────────────
+# Deduplicate rapid-fire identical events.
+# ──────────────────────────────────────────────────────────────
+
+CLAUDE_TMPDIR="${TMPDIR:-/tmp}"
+DEDUP_FILE="$CLAUDE_TMPDIR/claude-last-notif"
+if [ "${DEDUP_WINDOW:-2}" -gt 0 ] 2>/dev/null; then
+    _now_sec=$(date +%s)
+    _current_key="${HOOK_TYPE}|${NOTIF_TITLE}|${NOTIF_MESSAGE}"
+    if [ -f "$DEDUP_FILE" ]; then
+        IFS=$'\t' read -r _last_ts _last_key < "$DEDUP_FILE" 2>/dev/null || true
+        if [ -n "$_last_ts" ] && [ "$_last_key" = "$_current_key" ]; then
+            _delta=$((_now_sec - _last_ts))
+            if [ "$_delta" -ge 0 ] && [ "$_delta" -lt "$DEDUP_WINDOW" ] 2>/dev/null; then
+                exit 0
+            fi
+        fi
+    fi
+    printf '%s\t%s\n' "$_now_sec" "$_current_key" > "$DEDUP_FILE.$$.tmp" 2>/dev/null \
+        && mv -f "$DEDUP_FILE.$$.tmp" "$DEDUP_FILE" 2>/dev/null \
+        || rm -f "$DEDUP_FILE.$$.tmp" 2>/dev/null
 fi
 
 if [ "$SKIP_FOCUSED" = "true" ] && [ "$NOTIF_TITLE" = "Task Complete" ]; then
@@ -170,8 +217,10 @@ if [ "$HISTORY_ENABLED" = "true" ]; then
     python3 -c "
 import json, os, fcntl, datetime
 
-history_path = os.path.expanduser('~/.config/claude-tap/history.json')
-max_entries = int(os.environ.get('HISTORY_MAX', 100))
+config_dir = os.path.expanduser('~/.config/claude-tap')
+history_path = os.path.join(config_dir, 'history.json')
+error_path = os.path.join(config_dir, 'last-error.log')
+max_entries = max(1, int(os.environ.get('HISTORY_MAX', 100)))
 clear_days = int(os.environ.get('HISTORY_DAYS', 30))
 title = os.environ.get('NOTIF_TITLE', '')
 message = os.environ.get('FULL_MESSAGE', '')
@@ -186,35 +235,43 @@ entry = {
     'hook_type': hook_type
 }
 
-# Atomic read-modify-write with file locking
-fd = os.open(history_path, os.O_RDWR | os.O_CREAT, 0o600)
 try:
-    fcntl.flock(fd, fcntl.LOCK_EX)
-    f = os.fdopen(fd, 'r+')
+    fd = os.open(history_path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        content = f.read()
-        history = json.loads(content) if content.strip() else []
-    except (json.JSONDecodeError, ValueError):
-        history = []
-    history.append(entry)
-    # Prune entries older than clear_after_days
-    if clear_days > 0:
-        cutoff = (now - datetime.timedelta(days=clear_days)).isoformat(timespec='seconds')
-        history = [e for e in history if e.get('timestamp', '') >= cutoff]
-    # Enforce max_entries limit
-    if len(history) > max_entries:
-        history = history[-max_entries:]
-    f.seek(0)
-    f.truncate()
-    json.dump(history, f, indent=2)
-    f.write('\n')
-except Exception:
-    pass
-finally:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        f = os.fdopen(fd, 'r+')
+        try:
+            content = f.read()
+            history = json.loads(content) if content.strip() else []
+            if not isinstance(history, list):
+                history = []
+        except (json.JSONDecodeError, ValueError):
+            history = []
+        # Prune before append so max_entries is a hard cap even when
+        # clear_after_days is 0 (retain-forever mode).
+        if clear_days > 0:
+            cutoff = (now - datetime.timedelta(days=clear_days)).isoformat(timespec='seconds')
+            history = [e for e in history if e.get('timestamp', '') >= cutoff]
+        if len(history) >= max_entries:
+            history = history[-(max_entries - 1):]
+        history.append(entry)
+        f.seek(0)
+        f.truncate()
+        json.dump(history, f, indent=2)
+        f.write('\n')
+        f.flush()
+        os.fsync(fd)
+    finally:
+        try:
+            f.close()
+        except Exception:
+            os.close(fd)
+except Exception as exc:
     try:
-        f.close()
+        with open(error_path, 'a') as ef:
+            ef.write(f'{now.isoformat(timespec=\"seconds\")} history-write: {exc.__class__.__name__}: {exc}\n')
     except Exception:
-        os.close(fd)
+        pass
 " 2>/dev/null &
 fi
 

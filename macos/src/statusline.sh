@@ -123,6 +123,29 @@ YELLOW='\033[38;5;222m'
 GRAY='\033[38;5;245m'
 
 # ──────────────────────────────────────────────────────────────
+# Compute DND up-front so rate-limit warnings can respect it
+# ──────────────────────────────────────────────────────────────
+
+DND_ACTIVE="false"
+if [ -f "$HOME/.config/claude-tap/dnd" ]; then
+    DND_ACTIVE="true"
+fi
+if [ "$QUIET_ENABLED" = "true" ] && [ "$DND_ACTIVE" = "false" ]; then
+    CURRENT_TIME=$(date +%H:%M)
+    if [[ "$QUIET_START" > "$QUIET_END" ]]; then
+        # Overnight range (e.g., 22:00 to 07:00)
+        if [[ ! "$CURRENT_TIME" < "$QUIET_START" || "$CURRENT_TIME" < "$QUIET_END" ]]; then
+            DND_ACTIVE="true"
+        fi
+    else
+        # Same-day range
+        if [[ ! "$CURRENT_TIME" < "$QUIET_START" && "$CURRENT_TIME" < "$QUIET_END" ]]; then
+            DND_ACTIVE="true"
+        fi
+    fi
+fi
+
+# ──────────────────────────────────────────────────────────────
 # Helper functions
 # ──────────────────────────────────────────────────────────────
 
@@ -205,33 +228,45 @@ if [ "$SHOW_5H" = "true" ] && [ -n "$five_hour" ]; then
   reset_str=$(format_reset "$five_hour_resets")
   [ -n "$reset_str" ] && rate_5h_part="${rate_5h_part} ${DIM}(${reset_str})${RESET}"
 
-  # Cache rate limit percentage for notification tinting (use $TMPDIR for per-user isolation)
+  # Cache rate limit percentage for notification tinting (use $TMPDIR for per-user isolation).
+  # Write-then-rename so a concurrent notify.sh read never sees a half-written file.
   CLAUDE_TMPDIR="${TMPDIR:-/tmp}"
-  echo "$rate_int" > "$CLAUDE_TMPDIR/claude-rate-limit"
+  _rl_tmp="$CLAUDE_TMPDIR/claude-rate-limit.$$.tmp"
+  printf '%s\n' "$rate_int" > "$_rl_tmp" 2>/dev/null \
+      && mv -f "$_rl_tmp" "$CLAUDE_TMPDIR/claude-rate-limit" 2>/dev/null \
+      || rm -f "$_rl_tmp" 2>/dev/null
 
 
 
-  # Trigger rate limit warning notifications at configured thresholds
+  # Trigger rate limit warning notifications at configured thresholds.
+  # Respect DND / quiet hours — silent drop (but still set the dedup marker
+  # so the user isn't flooded when they leave quiet hours with usage still high).
   if [ "$rate_int" -ge "$CRIT_THRESHOLD" ]; then
     if [ ! -f "$CLAUDE_TMPDIR/claude-rate-warn-critical" ]; then
       touch "$CLAUDE_TMPDIR/claude-rate-warn-critical"
-      reset_msg=""
-      [ -n "$reset_str" ] && reset_msg=" Resets in ${reset_str}."
-      "$CONFIG_DIR/notch-notify" "Rate Limit Warning" "5h usage at ${rate_int}%.${reset_msg} Consider slowing down." "$CONFIG_DIR/claude-icon.png" "critical" &
-      if [ "$SND_ENABLED" = "true" ]; then
-          RATE_SND="${SND_RATE_WARN:-$SND_DEFAULT}"
-          [ -f "$RATE_SND" ] && afplay -v "$SND_VOLUME" "$RATE_SND" &
+      if [ "$DND_ACTIVE" != "true" ]; then
+        reset_msg=""
+        [ -n "$reset_str" ] && reset_msg=" Resets in ${reset_str}."
+        [ -x "$CONFIG_DIR/notch-notify" ] && \
+            "$CONFIG_DIR/notch-notify" "Rate Limit Warning" "5h usage at ${rate_int}%.${reset_msg} Consider slowing down." "$CONFIG_DIR/claude-icon.png" "critical" &
+        if [ "$SND_ENABLED" = "true" ]; then
+            RATE_SND="${SND_RATE_WARN:-$SND_DEFAULT}"
+            [ -f "$RATE_SND" ] && afplay -v "$SND_VOLUME" "$RATE_SND" &
+        fi
       fi
     fi
   elif [ "$rate_int" -ge "$WARN_THRESHOLD" ]; then
     if [ ! -f "$CLAUDE_TMPDIR/claude-rate-warn-warning" ]; then
       touch "$CLAUDE_TMPDIR/claude-rate-warn-warning"
-      reset_msg=""
-      [ -n "$reset_str" ] && reset_msg=" Resets in ${reset_str}."
-      "$CONFIG_DIR/notch-notify" "Rate Limit Warning" "5h usage at ${rate_int}%.${reset_msg}" "$CONFIG_DIR/claude-icon.png" "warning" &
-      if [ "$SND_ENABLED" = "true" ]; then
-          RATE_SND="${SND_RATE_WARN:-$SND_DEFAULT}"
-          [ -f "$RATE_SND" ] && afplay -v "$SND_VOLUME" "$RATE_SND" &
+      if [ "$DND_ACTIVE" != "true" ]; then
+        reset_msg=""
+        [ -n "$reset_str" ] && reset_msg=" Resets in ${reset_str}."
+        [ -x "$CONFIG_DIR/notch-notify" ] && \
+            "$CONFIG_DIR/notch-notify" "Rate Limit Warning" "5h usage at ${rate_int}%.${reset_msg}" "$CONFIG_DIR/claude-icon.png" "warning" &
+        if [ "$SND_ENABLED" = "true" ]; then
+            RATE_SND="${SND_RATE_WARN:-$SND_DEFAULT}"
+            [ -f "$RATE_SND" ] && afplay -v "$SND_VOLUME" "$RATE_SND" &
+        fi
       fi
     fi
   else
@@ -260,24 +295,8 @@ if [ "$SHOW_LINES" = "true" ]; then
   fi
 fi
 
-# DND indicator
+# DND indicator (DND_ACTIVE was computed earlier, before rate-limit warnings)
 dnd_part=""
-DND_ACTIVE="false"
-if [ -f "$HOME/.config/claude-tap/dnd" ]; then
-    DND_ACTIVE="true"
-fi
-if [ "$QUIET_ENABLED" = "true" ] && [ "$DND_ACTIVE" = "false" ]; then
-    CURRENT_TIME=$(date +%H:%M)
-    if [[ "$QUIET_START" > "$QUIET_END" ]]; then
-        if [[ ! "$CURRENT_TIME" < "$QUIET_START" || "$CURRENT_TIME" < "$QUIET_END" ]]; then
-            DND_ACTIVE="true"
-        fi
-    else
-        if [[ ! "$CURRENT_TIME" < "$QUIET_START" && "$CURRENT_TIME" < "$QUIET_END" ]]; then
-            DND_ACTIVE="true"
-        fi
-    fi
-fi
 if [ "$DND_ACTIVE" = "true" ]; then
     dnd_part="${DIM}DND${RESET}"
 fi

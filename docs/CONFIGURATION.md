@@ -105,7 +105,27 @@ Set to `false` to disable the visual notification overlay entirely. Sound will s
 |------|---------|
 | boolean | `false` |
 
-Controls notifications fired by Claude Code's `Notification` hook — idle "Claude is waiting for your input" prompts and tool-permission prompts. Leave `false` (default) to suppress them entirely (no sound, no overlay, no history entry); `Stop` events (task completion) are unaffected. Set to `true` to restore the previous behaviour where every `Notification` hook event produced an overlay.
+Controls **idle "Claude is waiting for your input"** pings only. These fire roughly every 60 seconds whenever Claude is idle-waiting on you and are noisy by design, so they stay suppressed by default (no sound, no overlay, no history entry). Set to `true` if you want a heartbeat every time Claude is idle. Tool-permission prompts are handled by `show_on_permission` below — changing this value has no effect on them.
+
+### notification.show_on_permission
+
+| Type | Default |
+|------|---------|
+| boolean | `true` |
+
+Controls **tool-permission prompts** — the blocking "Claude needs your permission to use X" events fired by the `Notification` hook. Shown by default since Claude halts until you respond. Set to `false` if you drive Claude only via pre-approved tools and don't want permission overlays.
+
+Classification is done by substring-matching the message delivered to the hook: anything containing `permission` (case-insensitive) is treated as a permission prompt; messages containing `waiting for your input` are treated as idle-waiting; any other Notification-hook message falls through to `permission` so unexpected attention-required events still surface.
+
+### notification.dedup_window_secs
+
+| Type | Default |
+|------|---------|
+| integer | `2` |
+
+Suppress a repeat notification when the previous one had the **same hook type, title, and message** and fired within this many seconds. Catches cases where Claude Code re-fires the same `Notification` hook back-to-back (e.g. on reconnect). Set to `0` to disable deduplication.
+
+The comparison key is `hook_type|title|message`, stored in `$TMPDIR/claude-last-notif`. Within-window duplicates exit before the history writer, so they don't pollute `history.json` either.
 
 ### notification.position
 
